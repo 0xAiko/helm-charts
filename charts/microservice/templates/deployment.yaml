@@ -1,0 +1,176 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "microservice.fullname" . }}
+  labels:
+    {{- include "microservice.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "microservice.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- if or .Values.podAnnotations .Values.configMapEnv .Values.secretEnv }}
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.configMapEnv }}
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.secretEnv }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+      {{- end }}
+      labels:
+        {{- include "microservice.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "microservice.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers.enabled }}
+      initContainers:
+        - name: {{ include "microservice.fullname" . }}-init-script
+          {{- if and .Values.initContainers.image.repository .Values.initContainers.image.tag }}
+          image: "{{ .Values.initContainers.image.repository }}:{{ .Values.initContainers.image.tag | default .Chart.AppVersion }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
+          command:
+            - /bin/sh
+            - -c
+            - /scripts/init-script.sh
+          volumeMounts:
+            - name: init-script
+              mountPath: /scripts
+          {{- if or .Values.configMapEnv .Values.secretEnv }}
+          envFrom:
+          {{- end }}
+            {{- if .Values.configMapEnv }}
+            - configMapRef:
+                name: {{ include "microservice.fullname" . }}-configmap-env
+            {{- end }}
+            {{- if .Values.secretEnv }}
+            - secretRef:
+                name: {{ include "microservice.fullname" . }}-secret-env
+            {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ include "microservice.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            {{ if .Values.service.ports.http }}
+            - name: http
+              containerPort: {{ .Values.service.ports.http }}
+              protocol: TCP
+            {{ end }}
+            {{ if .Values.service.ports.grpc }}
+            - name: grpc
+              containerPort: {{ .Values.service.ports.grpc }}
+              protocol: TCP
+            {{ end }}
+            {{ if .Values.service.ports.healthcheck }}
+            - name: healthcheck
+              containerPort: {{ .Values.service.ports.healthcheck }}
+              protocol: TCP
+            {{ end }}
+            {{ if .Values.service.ports.websocket }}
+            - name: websocket
+              containerPort: {{ .Values.service.ports.websocket }}
+              protocol: TCP
+            {{ end }}
+            {{ if .Values.service.ports.websocket }}
+            - name: websocket
+              containerPort: {{ .Values.service.ports.websocket }}
+              protocol: TCP
+            {{ end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: {{ .Values.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path }}
+              port: {{ .Values.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if or .Values.configMapEnv .Values.secretEnv }}
+          envFrom:
+          {{- end }}
+            {{- if .Values.configMapEnv }}
+            - configMapRef:
+                name: {{ include "microservice.fullname" . }}-configmap-env
+            {{- end }}
+            {{- if .Values.secretEnv }}
+            - secretRef:
+                name: {{ include "microservice.fullname" . }}-secret-env
+            {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+            {{- if .Values.configMapVolume.enabled }}
+            - name: configmap-volume
+              mountPath: {{ .Values.configMapVolume.mountPath }}
+            {{- end }}
+            {{- if .Values.secretVolume.enabled }}
+            - name: secret-volume
+              mountPath: {{ .Values.secretVolume.mountPath }}
+            {{- end }}
+          {{- end }}
+      volumes:
+        {{- if .Values.volumes }}
+        {{- toYaml .Values.volumes | nindent 8 }}
+        {{- end }}
+        {{- if .Values.initContainers.enabled }}
+        - name: init-script
+          configMap:
+            name: {{ include "microservice.fullname" . }}-init-script
+            items:
+              - key: init-script.sh
+                path: init-script.sh
+                mode: 0755
+        {{- end }}
+        {{- if .Values.configMapVolume.enabled }}
+        - name: configmap-volume
+          configMap:
+            name: {{ include "microservice.fullname" . }}-configmap-volume
+        {{- end }}
+        {{- if .Values.secretVolume.enabled }}
+        - name: secret-volume
+          secret:
+            secretName: {{ include "microservice.fullname" . }}-secret-volume
+            defaultMode: {{ .Values.secretVolume.defaultMode }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

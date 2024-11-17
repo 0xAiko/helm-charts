@@ -1,0 +1,36 @@
+{{- if .Values.configMapEnv }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "microservice.fullname" . }}-configmap-env
+data:
+  {{- range $key, $value := .Values.configMapEnv }}
+  {{ $key }}: {{ default "" $value | quote }}
+  {{- end }}
+{{- end }}
+
+---
+
+{{- if .Values.configMapVolume.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "microservice.fullname" . }}-configmap-volume
+data:
+  {{- range .Values.configMapVolume.files }}
+  {{ .name }}: |
+    {{ .content | nindent 4 }}
+  {{- end }}
+{{- end }}
+
+---
+
+{{- if .Values.initContainers.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "microservice.fullname" . }}-init-script
+data:
+  init-script.sh: |
+    {{- tpl .Values.initContainers.script $ | nindent 4 }}
+{{- end }}
