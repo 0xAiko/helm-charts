@@ -1,5 +1,0 @@
-apiVersion: v2
-name: microservice
-description: A Helm chart for a generic microservice
-version: 0.0.1
-appVersion: 0.0.1
