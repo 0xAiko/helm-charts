@@ -1,0 +1,13 @@
+apiVersion: v1
+entries:
+  microservice:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2024-11-23T10:20:35.424753548Z"
+    description: A Helm chart for a generic microservice
+    digest: 0ef93ce57ea3f7c0119483bd34a4a5310772c8a5cc3567b02cc03298e1736964
+    name: microservice
+    urls:
+    - https://github.com/0xAiko/helm-charts/releases/download/microservice-0.1.0/microservice-0.1.0.tgz
+    version: 0.1.0
+generated: "2024-11-23T10:20:35.424763867Z"
